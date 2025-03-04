@@ -80,12 +80,12 @@ def calibrate_leads(leads, pixel_to_time=25, pixel_to_voltage=10):
     
     return calibrated_leads
 
-# Waveform Extraction
+# Waveform Extraction (Modified to give time difference and amplitude)
 def extract_waveform_data(lead_data):
     """
     Extract key parameters from each lead, including P wave, QRS complex, and T wave.
     :param lead_data: Tuple of time and voltage data for the lead
-    :return: Dictionary with extracted wave parameters (P, QRS, T)
+    :return: Dictionary with extracted wave parameters (P, QRS, T) with time difference and amplitude
     """
     time, voltage = lead_data
 
@@ -94,7 +94,7 @@ def extract_waveform_data(lead_data):
     qrs_peaks, _ = find_peaks(voltage, height=1.0, distance=10)
     t_peaks, _ = find_peaks(voltage, height=0.5, distance=50)
 
-    # Extract metrics for each wave
+    # Extract metrics for each wave (time difference and amplitude)
     waves = {
         "P_wave": extract_wave_metrics(time, voltage, p_peaks),
         "QRS_complex": extract_qrs_metrics(time, voltage, qrs_peaks),
@@ -105,32 +105,32 @@ def extract_waveform_data(lead_data):
 
 def extract_wave_metrics(time, voltage, peaks):
     """
-    Extract key parameters (start, peak, end, amplitude) for a given wave.
+    Extract the time difference and amplitude for a given wave.
     :param time: Time array for the ECG lead
     :param voltage: Voltage array for the ECG lead
     :param peaks: List of indices where peaks occur
-    :return: Dictionary with start, peak, end, and amplitude for the wave
+    :return: Dictionary with time_difference and amplitude for the wave
     """
     wave_metrics = []
     for peak in peaks:
-        start = time[max(0, peak-10)]  # Estimate start before peak
-        end = time[min(len(time)-1, peak+10)]  # Estimate end after peak
+        # Estimate start before peak and end after peak (based on peak position)
+        start = time[max(0, peak-10)]  
+        end = time[min(len(time)-1, peak+10)]  
         amplitude = voltage[peak]  # Peak amplitude
+        time_difference = end - start  # Calculate time difference
         wave_metrics.append({
-            "start": start,
-            "peak": time[peak],
-            "end": end,
-            "amplitude": amplitude
+            "amplitude": amplitude,
+            "time_difference": time_difference  # Time difference between start and end
         })
     return wave_metrics
 
 def extract_qrs_metrics(time, voltage, qrs_peaks):
     """
-    Extract individual Q, R, S components of the QRS complex.
+    Extract time difference and amplitude for individual Q, R, and S components of the QRS complex.
     :param time: Time array for the ECG lead
     :param voltage: Voltage array for the ECG lead
     :param qrs_peaks: Indices where QRS peaks occur
-    :return: Dictionary with Q, R, S wave data
+    :return: Dictionary with time difference and amplitude data for Q, R, S waves
     """
     qrs_metrics = {
         "Q": extract_wave_metrics(time, voltage, qrs_peaks),
@@ -139,29 +139,23 @@ def extract_qrs_metrics(time, voltage, qrs_peaks):
     }
     return qrs_metrics
 
-# Output Formatting
-def generate_json_output(calibrated_leads, num_leads=12):
+# Output Formatting (For just second lead)
+def generate_json_output_for_second_lead(calibrated_leads):
     """
-    Generate the final JSON output with all waveforms and their parameters.
+    Generate the final JSON output for just the second lead with time difference and amplitude.
     :param calibrated_leads: List of calibrated lead data
-    :param num_leads: Number of ECG leads
-    :return: JSON formatted string with waveform data for each lead
+    :return: JSON formatted string with waveform data for the second lead
     """
-    all_leads_data = {}
+    second_lead_data = calibrated_leads[1]  # Extract the second lead (index 1)
+    waves = extract_waveform_data(second_lead_data)
 
-    for i in range(num_leads):
-        lead_data = calibrated_leads[i]
-        waves = extract_waveform_data(lead_data)
-        lead_name = f"lead_{i+1}"
-        all_leads_data[lead_name] = waves
-    
     # Convert to JSON format
-    json_output = json.dumps(all_leads_data, indent=4)
+    json_output = json.dumps(waves, indent=4)
     return json_output
 
 def main(image_path):
     """
-    Main function to process ECG image and output waveform data in JSON format.
+    Main function to process ECG image and output waveform data in JSON format for the second lead.
     :param image_path: Path to the ECG image file
     """
     try:
@@ -177,14 +171,14 @@ def main(image_path):
         logging.info("Calibrating leads...")
         calibrated_leads = calibrate_leads(leads)
 
-        # Step 4: Generate output in JSON format
-        logging.info("Generating JSON output...")
-        json_output = generate_json_output(calibrated_leads)
+        # Step 4: Generate output for the second lead
+        logging.info("Generating JSON output for second lead...")
+        json_output = generate_json_output_for_second_lead(calibrated_leads)
 
         # Print or save the output
-        with open('ecg_waveform_data.json', 'w') as json_file:
+        with open('ecg_waveform_data_second_lead.json', 'w') as json_file:
             json_file.write(json_output)
-        logging.info("ECG waveform data has been successfully written to 'ecg_waveform_data.json'.")
+        logging.info("ECG waveform data for the second lead has been successfully written to 'ecg_waveform_data_second_lead.json'.")
 
     except Exception as e:
         logging.error(f"An error occurred: {e}")
